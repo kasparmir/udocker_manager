@@ -4,6 +4,7 @@ from flask import render_template_string, request, jsonify, redirect, url_for
 from app import app, config_manager, udocker, container_manager
 from templates.html_template import HTML_TEMPLATE
 import time
+import json
 
 @app.route('/')
 def index():
@@ -99,22 +100,23 @@ def pull_image():
 def pull_progress(image):
     """Server-sent events pro progress pull operace"""
     def generate():
-        yield f"data: {{'progress': 10, 'message': 'Připojuji se k registru...'}}\n\n"
+        # OPRAVA: Použití json.dumps() pro správný JSON formát
+        yield f"data: {json.dumps({'progress': 10, 'message': 'Připojuji se k registru...'})}\n\n"
         time.sleep(0.5)
         
-        yield f"data: {{'progress': 30, 'message': 'Stahuji metadata...'}}\n\n"
+        yield f"data: {json.dumps({'progress': 30, 'message': 'Stahuji metadata...'})}\n\n"
         time.sleep(0.5)
         
-        yield f"data: {{'progress': 50, 'message': 'Stahuji vrstvy image...'}}\n\n"
+        yield f"data: {json.dumps({'progress': 50, 'message': 'Stahuji vrstvy image...'})}\n\n"
         
         success, message = udocker.pull_image(image)
         
         if success:
-            yield f"data: {{'progress': 90, 'message': 'Rozbaluji image...'}}\n\n"
+            yield f"data: {json.dumps({'progress': 90, 'message': 'Rozbaluji image...'})}\n\n"
             time.sleep(0.3)
-            yield f"data: {{'progress': 100, 'message': 'Hotovo!', 'success': true}}\n\n"
+            yield f"data: {json.dumps({'progress': 100, 'message': 'Hotovo!', 'success': True})}\n\n"
         else:
-            yield f"data: {{'error': '{message}'}}\n\n"
+            yield f"data: {json.dumps({'error': message})}\n\n"
     
     return app.response_class(generate(), mimetype='text/event-stream')
 
@@ -128,6 +130,13 @@ def delete_image():
     image_name = request.form['image']
     success, message = udocker.delete_image(image_name)
     return jsonify({'success': success, 'message': message})
+
+@app.route('/logs/<container_id>', methods=['GET'])
+def get_logs(container_id):
+    """Získá logy kontejneru"""
+    lines = request.args.get('lines', 100, type=int)
+    success, logs = udocker.get_container_logs(container_id, lines)
+    return jsonify({'success': success, 'logs': logs})
 
 @app.route('/check-image/<path:image>', methods=['GET'])
 def check_image(image):

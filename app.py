@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """UDocker Web Manager - Hlavní soubor"""
 
 import sys
